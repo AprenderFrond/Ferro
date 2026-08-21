@@ -1,0 +1,316 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <h3 class="text-dark mb-3"><i class="bi bi-cart-plus text-primary me-2"></i>Nueva Venta</h3>
+                
+                <div class="position-relative">
+                    <label class="form-label fw-bold">Buscar por Nombre o Código de Barras:</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-primary"><i class="bi bi-search text-primary"></i></span>
+                        <input type="text" class="form-control border-primary form-control-lg" id="buscador-venta" placeholder="Escribe 'Tubo', 'Ducha', 'Cables' o escanea un código...">
+                    </div>
+                    <div class="list-group position-absolute w-100 shadow-lg mt-1 d-none" id="lista-resultados" style="z-index: 1050;">
+                        </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                <div class="p-3 border-bottom bg-light">
+                    <h5 class="mb-0 text-dark fw-bold"><i class="bi bi-list-stars text-primary me-2"></i>Artículos en la Venta</h5>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" id="tabla-carrito">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Producto</th>
+                                <th class="text-end" style="width: 150px;">Precio Unitario</th>
+                                <th class="text-center" style="width: 130px;">Cantidad</th>
+                                <th class="text-end" style="width: 150px;">Subtotal</th>
+                                <th class="text-center" style="width: 70px;">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cuerpo-carrito">
+                            <tr id="carrito-vacio">
+                                <td colspan="5" class="text-center text-muted py-5">
+                                    <i class="bi bi-cart-x fs-2 d-block mb-2 text-secondary"></i>
+                                    El carrito está vacío. Busca un producto arriba para agregarlo.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card border-0 bg-dark text-white shadow-sm h-100">
+            <div class="card-body d-flex flex-column justify-content-between p-4">
+                <div>
+                    <h4 class="border-bottom border-secondary pb-2 mb-4 text-warning fw-bold">
+                        <i class="bi bi-receipt me-2"></i>Resumen de Factura
+                    </h4>
+
+                    <div class="mb-4">
+                        <label class="form-label small fw-bold text-light">Nombre del Cliente / Maestro de Obra:</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-secondary border-0 text-white"><i class="bi bi-person"></i></span>
+                            <input type="text" class="form-control border-0" id="nombre-cliente" placeholder="Consumidor Final" value="Consumidor Final">
+                        </div>
+                        <small class="text-muted d-block mt-1">Déjalo como está para clientes rápidos de mostrador.</small>
+                    </div>
+
+                    <div class="bg-secondary bg-opacity-25 p-3 rounded border border-secondary mb-4 text-center">
+                        <span class="text-muted small d-block mb-1 text-uppercase fw-bold">Total a Cobrar</span>
+                        <h1 class="text-success fw-bold mb-0" id="total-factura">$0</h1>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button class="btn btn-warning w-100 btn-lg fw-bold text-dark shadow py-3" id="btn-cobrar" onclick="procesarCobro()">
+                        <i class="bi bi-cash-coin me-2 fs-5"></i>COBRAR E IMPRIMIR
+                    </button>
+                    <button type="button" class="btn btn-outline-warning w-100 mb-2 fw-bold" onclick="imprimirCotizacion()">
+                    <i class="bi bi-file-earmark-text-fill"></i> Imprimir Cotización
+                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let carrito = [];
+const buscador = document.getElementById('buscador-venta');
+const listaResultados = document.getElementById('lista-resultados');
+const cuerpoCarrito = document.getElementById('cuerpo-carrito');
+const totalFactura = document.getElementById('total-factura');
+
+// 1. EVENTO: Buscar productos mientras se escribe
+buscador.addEventListener('input', function() {
+    const texto = this.value.trim();
+    if (texto.length < 2) {
+        listaResultados.classList.add('d-none');
+        return;
+    }
+
+    fetch(`/api/buscar_producto?q=${encodeURIComponent(texto)}`)
+        .then(response => response.json())
+        .then(productos => {
+            listaResultados.innerHTML = '';
+            if (productos.length === 0) {
+                listaResultados.innerHTML = `<div class="list-group-item text-muted small py-3">No se encontraron productos...</div>`;
+                listaResultados.classList.remove('d-none');
+                return;
+            }
+
+            productos.forEach(p => {
+                const boton = document.createElement('button');
+                boton.type = 'button';
+                boton.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2.5';
+                boton.innerHTML = `
+                    <div>
+                        <strong class="text-dark">${p.nombre}</strong>
+                        <span class="text-muted small d-block">Código: ${p.codigo_barras} | Stock: <strong class="${p.stock <= 5 ? 'text-danger':'text-success'}">${p.stock} Unid.</strong></span>
+                    </div>
+                    <span class="badge bg-primary fs-6">$${p.precio.toLocaleString('es-CO', {maximumFractionDigits:0})}</span>
+                `;
+                
+                boton.onclick = function() {
+                    agregarAlCarrito(p);
+                    buscador.value = '';
+                    listaResultados.classList.add('d-none');
+                };
+                listaResultados.appendChild(boton);
+            });
+            listaResultados.classList.remove('d-none');
+        });
+});
+
+// Ocultar buscador si hacen clic afuera
+document.addEventListener('click', function(e) {
+    if (!buscador.contains(e.target) && !listaResultados.contains(e.target)) {
+        listaResultados.classList.add('d-none');
+    }
+});
+
+// 2. FUNCIÓN: Agregar un artículo seleccionado al carrito
+function agregarAlCarrito(producto) {
+    const existe = carrito.find(item => item.id === producto.id);
+    if (existe) {
+        if (existe.cantidad >= producto.stock) {
+            alert(`No puedes agregar más unidades. El stock máximo disponible es ${producto.stock}`);
+            return;
+        }
+        existe.cantidad++;
+    } else {
+        if (producto.stock < 1) {
+            alert("Este producto no cuenta con existencias en inventario.");
+            return;
+        }
+        carrito.push({
+            id: producto.id,
+            nombre: producto.nombre,
+            precio: producto.precio,
+            stock: producto.stock,
+            cantidad: 1
+        });
+    }
+    renderizarCarrito();
+}
+
+// 3. FUNCIÓN: Dibujar el carrito en la pantalla y recalcular
+function renderizarCarrito() {
+    const vacioRow = document.getElementById('carrito-vacio');
+    const filasViejas = cuerpoCarrito.querySelectorAll('.fila-item');
+    filasViejas.forEach(f => f.remove());
+
+    if (carrito.length === 0) {
+        if (vacioRow) vacioRow.classList.remove('d-none');
+        totalFactura.innerText = '$0';
+        return;
+    }
+
+    if (vacioRow) vacioRow.classList.add('d-none');
+    let sumaTotal = 0;
+
+    carrito.forEach((item, index) => {
+        const subtotal = item.precio * item.cantidad;
+        sumaTotal += subtotal;
+
+        const tr = document.createElement('tr');
+        tr.className = 'fila-item';
+        tr.innerHTML = `
+            <td><strong class="text-dark">${item.nombre}</strong></td>
+            <td class="text-end">$${item.precio.toLocaleString('es-CO', {maximumFractionDigits:0})}</td>
+            <td class="text-center">
+                <input type="number" class="form-control form-control-sm mx-auto text-center border-secondary fw-bold" 
+                       value="${item.cantidad}" min="1" max="${item.stock}" style="width: 80px;"
+                       onchange="actualizarCantidad(${index}, this.value)">
+            </td>
+            <td class="text-end fw-bold text-primary">$${subtotal.toLocaleString('es-CO', {maximumFractionDigits:0})}</td>
+            <td class="text-center">
+                <button class="btn btn-sm btn-outline-danger" onclick="eliminarDelCarrito(${index})">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        `;
+        cuerpoCarrito.appendChild(tr);
+    });
+
+    totalFactura.innerText = '$' + sumaTotal.toLocaleString('es-CO', {maximumFractionDigits:0});
+}
+
+function actualizarCantidad(index, valor) {
+    const cantidad = parseInt(valor);
+    if (isNaN(cantidad) || cantidad < 1) {
+        carrito[index].cantidad = 1;
+    } else if (cantidad > carrito[index].stock) {
+        alert(`Stock insuficiente. Solo quedan ${carrito[index].stock} unidades.`);
+        carrito[index].cantidad = carrito[index].stock;
+    } else {
+        carrito[index].amount = cantidad;
+        carrito[index].cantidad = cantidad;
+    }
+    renderizarCarrito();
+}
+
+function eliminarDelCarrito(index) {
+    carrito.splice(index, 1);
+    renderizarCarrito();
+}
+
+// 4. FUNCIÓN: Enviar la venta al Servidor de Python (CORREGIDA)
+function procesarCobro() {
+    if (carrito.length === 0) {
+        alert("Por favor, agrega al menos un producto al carrito antes de cobrar.");
+        return;
+    }
+
+    const inputCliente = document.getElementById('nombre-cliente');
+    const clienteName = inputCliente ? inputCliente.value.trim() : 'Consumidor Final';
+    const btnCobrar = document.getElementById('btn-cobrar');
+
+    if (btnCobrar) {
+        btnCobrar.disabled = true;
+        btnCobrar.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Procesando Venta...`;
+    }
+
+    // Calculamos el total exacto antes de enviar
+    let totalVenta = carrito.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
+
+    const payload = {
+        cliente: clienteName || 'Consumidor Final',
+        total: totalVenta,
+        fecha: new Date().toISOString().slice(0, 19).replace('T', ' '),
+        productos: carrito
+    };
+
+    fetch('/api/procesar_venta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload) // <-- Corregido: Enviamos payload, no datosVenta
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert("¡Venta registrada con éxito! Presiona Aceptar para abrir la factura de impresión.");
+            window.location.href = `/historial/imprimir/${data.venta_id}`;
+        } else {
+            alert("Error: " + data.message);
+            if (btnCobrar) {
+                btnCobrar.disabled = false;
+                btnCobrar.innerHTML = `COBRAR E IMPRIMIR`;
+            }
+        }
+    })
+    .catch(err => {
+        console.error("Error en la petición:", err);
+        if (btnCobrar) {
+            btnCobrar.disabled = false;
+            btnCobrar.innerHTML = `COBRAR E IMPRIMIR`;
+        }
+    }); 
+}
+function imprimirCotizacion() {
+    // Revisa cómo se llama tu variable global del carrito (suele ser 'carrito' o 'listaProductos')
+    if (carrito.length === 0) {
+        alert("El carrito está vacío. Agrega productos para poder cotizar.");
+        return;
+    }
+    
+    // Obtenemos el nombre del cliente/maestro si hay un input para ello
+    const clienteInput = document.getElementById('cliente') || document.getElementById('nombre_cliente');
+    const cliente = clienteInput ? clienteInput.value : "Consumidor Final";
+    
+    // Convertimos los datos a un formato seguro para la URL u oculto
+    // Para hacerlo limpio y rápido, creamos un formulario temporal que envíe por POST
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/imprimir_cotizacion';
+    form.target = '_blank'; // Abre en pestaña nueva
+    
+    const inputCliente = document.createElement('input');
+    inputCliente.type = 'hidden';
+    inputCliente.name = 'cliente';
+    inputCliente.value = cliente;
+    form.appendChild(inputCliente);
+    
+    const inputProductos = document.createElement('input');
+    inputProductos.type = 'hidden';
+    inputProductos.name = 'productos';
+    inputProductos.value = JSON.stringify(carrito);
+    form.appendChild(inputProductos);
+    
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+}
+</script>
+{% endblock %}

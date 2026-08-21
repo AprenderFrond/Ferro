@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Cotización - La Clínica del Hogar</title>
+    <style>
+        body { font-family: 'Courier New', Courier, monospace; width: 280px; margin: 0 auto; padding: 10px; font-size: 12px; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .header { margin-bottom: 15px; }
+        .empresa { font-size: 16px; font-weight: bold; }
+        .linea { border-bottom: 1px dashed #000; margin: 8px 0; }
+        table { width: 100%; border-collapse: collapse; }
+        .total { font-size: 14px; font-weight: bold; margin-top: 10px; }
+        .nota { font-size: 10px; margin-top: 15px; font-style: italic; text-align: center; }
+        @media print { button { display: none; } }
+    </style>
+</head>
+<body>
+    <div class="text-center">
+        <button onclick="window.print();" style="padding: 5px 10px; margin-bottom: 10px; background: #ffc107; border: 0; cursor: pointer; font-weight: bold;">🖨️ IMPRIMIR</button>
+    </div>
+    
+    <div class="header text-center">
+        <div class="empresa">LA CLÍNICA DEL HOGAR</div>
+        <div>Ferretería y Materiales</div>
+        <div class="linea"></div>
+        <div style="font-weight: bold; font-size: 14px;">*** COTIZACIÓN ***</div>
+    </div>
+    
+    <div>
+        <strong>Fecha:</strong> {{ fecha }}<br>
+        <strong>Cliente:</strong> {{ cliente }}<br>
+    </div>
+    
+    <div class="linea"></div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th align="left">Cant / Prod</th>
+                <th class="text-right">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in productos %}
+            <tr>
+                <td colspan="2" style="padding-top: 5px;">{{ p.nombre }}</td>
+            </tr>
+            <tr>
+                <td>{{ p.cantidad }} x ${{ "{:,.0f}".format(p.precio_formateado) }}</td>
+                <td class="text-right">${{ "{:,.0f}".format(p.subtotal) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <div class="linea"></div>
+    
+    <div class="total text-right">
+        TOTAL ESTIMADO: ${{ "{:,.0f}".format(total) }}
+    </div>
+    
+    <div class="nota">
+        * Precios informativos sujetos a cambios.<br>
+        * Esta cotización NO reserva inventario.<br>
+        ¡Gracias por cotizar con nosotros!
+    </div>
+
+    <script>
+        // Dispara el diálogo de impresión automáticamente al cargar la pestaña
+        window.onload = function() {
+            window.print();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,298 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<!-- Bloque para mostrar mensajes de Alerta (Éxito / Error) -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm" role="alert">
+         {{ message }}
+         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+    <div>
+        <h2 class="text-dark"><i class="bi bi-boxes text-primary me-2"></i>Control de Inventario</h2>
+        <p class="text-muted mb-0">Gestiona las existencias y categorías de la ferretería</p>
+    </div>
+    <button class="btn btn-amarillo-negocio shadow-sm" data-bs-toggle="modal" data-bs-target="#modalProducto">
+        <i class="bi bi-plus-circle me-2"></i>Nuevo Producto
+    </button>
+</div>
+
+<!-- SECCIÓN: Barra de Búsqueda y Filtro por Categorías -->
+<div class="card mb-4 border-0 bg-light shadow-sm">
+    <div class="card-body row g-3 align-items-center">
+        <!-- RECOMENDACIÓN 1: Buscador por Texto -->
+        <div class="col-md-6 col-lg-5">
+            <label class="form-label fw-bold text-dark"><i class="bi bi-search text-primary me-1"></i> Buscar Producto:</label>
+            <input type="text" class="form-control border-primary" id="buscador-texto" placeholder="Escribe el nombre o código de barras...">
+        </div>
+        <!-- Filtro por Categoría -->
+        <div class="col-md-6 col-lg-4">
+            <label class="form-label fw-bold text-dark"><i class="bi bi-filter-circle text-primary me-1"></i> Filtrar por Categoría:</label>
+            <select class="form-select border-primary" id="filtro-categoria">
+                <option value="todos">-- Mostrar Todos --</option>
+                {% for cat in categories %}
+                    <option value="{{ cat.nombre }}">{{ cat.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12 col-lg-3 mt-md-4 text-lg-end">
+            <span class="text-muted small">Mostrando: <strong id="contador-productos" class="text-primary">{{ productos|length }}</strong> artículo(s).</span>
+        </div>
+    </div>
+</div>
+
+<!-- Tabla de Productos -->
+<div class="table-responsive">
+    <table class="table table-hover align-middle" id="tabla-inventario">
+        <thead class="table-light border-bottom border-primary">
+            <tr>
+                <th>Código</th>
+                <th>Producto</th>
+                <th>Categoría</th>
+                <th class="text-end">P. Compra</th>
+                <th class="text-end">P. Venta</th>
+                <th class="text-center">Stock Act.</th>
+                <th class="text-center">Estado</th>
+                <th class="text-center">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for producto in productos %}
+            <!-- Guardamos nombre y código en minúsculas en el data-buscar para facilitar la búsqueda rápida -->
+            <tr class="fila-producto" 
+                data-categoria="{{ producto.categoria_nombre if producto.categoria_nombre else 'General' }}"
+                data-buscar="{{ producto.nombre.lower() }} {{ producto.codigo_barras.lower() if producto.codigo_barras else '' }}">
+                
+                <td><strong>{{ producto.codigo_barras if producto.codigo_barras else '-' }}</strong></td>
+                <td class="nombre-producto">{{ producto.nombre }}</td>
+                <td><span class="badge bg-secondary">{{ producto.categoria_nombre if producto.categoria_nombre else 'General' }}</span></td>
+                <td class="text-end">${{ "{:,.0f}".format(producto.precio_compra) }}</td>
+                <td class="text-end fw-bold text-success">${{ "{:,.0f}".format(producto.precio_venta) }}</td>
+                <td class="text-center">
+                    <span class="fs-6 fw-bold {% if producto.stock <= producto.stock_minimo %}text-danger{% else %}text-dark{% endif %}">
+                        {{ producto.stock }}
+                    </span>
+                </td>
+                <td class="text-center">
+                    {% if producto.stock <= producto.stock_minimo %}
+                        <span class="badge bg-danger">Por Agotarse</span>
+                    {% else %}
+                        <span class="badge bg-success">Disponible</span>
+                    {% endif %}
+                </td>
+                <td class="text-center">
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalEditar{{ producto.id }}">
+                            <i class="bi bi-pencil-square"></i>
+                        </button>
+                        <!-- RECOMENDACIÓN 4: Botón para abrir Modal de Confirmación de Eliminación -->
+                        <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalEliminar{{ producto.id }}">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+
+            <!-- MODAL PARA EDITAR PRODUCTO -->
+            <div class="modal fade" id="modalEditar{{ producto.id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header bg-dark text-white">
+                            <h5 class="modal-title"><i class="bi bi-pencil-square me-2 text-amarillo-negocio"></i>Modificar: {{ producto.nombre }}</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-toggle="modal" aria-label="Close"></button>
+                        </div>
+                        <form action="/editar_producto/{{ producto.id }}" method="POST">
+                            <div class="modal-body row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Código de Barras / Referencia</label>
+                                    <input type="text" class="form-control" name="codigo_barras" value="{{ producto.codigo_barras if producto.codigo_barras else '' }}">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Categoría *</label>
+                                    <select class="form-select" name="categoria_id" required>
+                                        {% for cat in categories %}
+                                            <option value="{{ cat.id }}" {% if cat.id == producto.categoria_id %}selected{% endif %}>{{ cat.nombre }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-bold">Nombre del Producto *</label>
+                                    <input type="text" class="form-control" name="nombre" value="{{ producto.nombre }}" required>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Descripción corta</label>
+                                    <textarea class="form-control" name="descripcion" rows="2">{{ producto.descripcion if producto.descripcion else '' }}</textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Precio de Compra ($) *</label>
+                                    <input type="number" step="0.01" class="form-control" name="precio_compra" value="{{ producto.precio_compra }}" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Precio de Venta ($) *</label>
+                                    <input type="number" step="0.01" class="form-control" name="precio_venta" value="{{ producto.precio_venta }}" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Stock Actual *</label>
+                                    <input type="number" class="form-control" name="stock" value="{{ producto.stock }}" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Alerta Stock Mínimo *</label>
+                                    <input type="number" class="form-control" name="stock_minimo" value="{{ producto.stock_minimo }}" required>
+                                </div>
+                            </div>
+                            <div class="modal-footer bg-light">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-azul-negocio text-white fw-bold px-4">Actualizar Cambios</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RECOMENDACIÓN 4: MODAL DE CONFIRMACIÓN DE ELIMINACIÓN -->
+            <div class="modal fade" id="modalEliminar{{ producto.id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill me-2"></i>¿Eliminar Producto?</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-toggle="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body text-center py-4">
+                            <p class="mb-2 fs-5">¿Estás seguro de que deseas eliminar este producto?</p>
+                            <p class="text-danger fw-bold bg-light p-2 rounded border border-danger shadow-sm mb-0">
+                                {{ producto.nombre }}
+                            </p>
+                            <small class="text-muted d-block mt-3">Esta acción no se puede deshacer y borrará el historial de stock del artículo.</small>
+                        </div>
+                        <div class="modal-footer bg-light justify-content-center">
+                            <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">No, Cancelar</button>
+                            <form action="/eliminar_producto/{{ producto.id }}" method="POST" class="d-inline">
+                                <button type="submit" class="btn btn-danger px-4 fw-bold">Sí, Eliminar</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% else %}
+            <tr>
+                <td colspan="8" class="text-center text-muted py-4">
+                    <i class="bi bi-info-circle fs-4 d-block mb-2"></i>
+                    No hay productos registrados en el inventario todavía.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- MODAL PARA REGISTRAR PRODUCTO NUEVO -->
+<div class="modal fade" id="modalProducto" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-azul-negocio text-white">
+                <h5 class="modal-title"><i class="bi bi-tag me-2 text-amarillo-negocio"></i>Registrar Nuevo Artículo</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-toggle="modal" aria-label="Close"></button>
+            </div>
+            <form action="/guardar_producto" method="POST">
+                <div class="modal-body row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Código de Barras / Referencia</label>
+                        <input type="text" class="form-control" name="codigo_barras" placeholder="Escanear o escribir (opcional)">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Categoría *</label>
+                        <select class="form-select" name="categoria_id" required>
+                            <option value="" disabled selected>-- Seleccionar Categoría --</option>
+                            {% for cat in categories %}
+                                <option value="{{ cat.id }}">{{ cat.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold">Nombre del Producto *</label>
+                        <input type="text" class="form-control" name="nombre" placeholder="Ej: Ducha Eléctrica Lorenzetti 110V" required>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Descripción corta</label>
+                        <textarea class="form-control" name="descripcion" rows="2" placeholder="Detalles de empaque, color o medidas..."></textarea>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Precio de Compra ($) *</label>
+                        <input type="number" step="0.01" class="form-control" name="precio_compra" placeholder="0" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Precio de Venta ($) *</label>
+                        <input type="number" step="0.01" class="form-control" name="precio_venta" placeholder="0" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Stock Inicial *</label>
+                        <input type="number" class="form-control" name="stock" value="0" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Alerta Stock Mínimo *</label>
+                        <input type="number" class="form-control" name="stock_minimo" value="5" required>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-azul-negocio text-white fw-bold px-4">Guardar Producto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- JS AVANZADO: FILTRADO COMBINADO (TEXTO + CATEGORÍA) Y AUTO-CIERRE -->
+<script>
+const buscadorTexto = document.getElementById('buscador-texto');
+const filtroCategoria = document.getElementById('filtro-categoria');
+const filas = document.querySelectorAll('.fila-producto');
+const contadorProductos = document.getElementById('contador-productos');
+
+function filtrarTabla() {
+    const textoBusqueda = buscadorTexto.value.toLowerCase().trim();
+    const categoriaSeleccionada = filtroCategoria.value;
+    let contador = 0;
+
+    filas.forEach(fila => {
+        const contenidoFila = fila.getAttribute('data-buscar');
+        const categoriaFila = fila.getAttribute('data-categoria');
+
+        // Evalúa si cumple la condición de texto y de categoría al mismo tiempo
+        const coincideTexto = contenidoFila.includes(textoBusqueda);
+        const coincideCategoria = (categoriaSeleccionada === 'todos' || categoriaFila === categoriaSeleccionada);
+
+        if (coincideTexto && coincideCategoria) {
+            fila.style.display = ''; 
+            contador++;
+        } else {
+            fila.style.display = 'none'; 
+        }
+    });
+
+    contadorProductos.innerText = contador;
+}
+
+// Escuchar eventos en tiempo real
+buscadorTexto.addEventListener('input', filtrarTabla);
+filtroCategoria.addEventListener('change', filtrarTabla);
+
+// Auto-cierre de alertas en 3 segundos
+document.addEventListener("DOMContentLoaded", function() {
+    const alertas = document.querySelectorAll('.alert');
+    alertas.forEach(function(alerta) {
+        setTimeout(function() {
+            const bsAlerta = new bootstrap.Alert(alerta);
+            bsAlerta.close();
+        }, 3000);
+    });
+});
+</script>
+{% endblock %}

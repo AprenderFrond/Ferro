@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="text-dark mb-0"><i class="bi bi-journal-text text-primary me-2"></i>Historial de Ventas</h3>
+            <a href="/ventas" class="btn btn-primary"><i class="bi bi-cart-plus me-2"></i>Nueva Venta</a>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 100px;">Factura #</th>
+                        <th>Fecha y Hora</th>
+                        <th>Cliente / Maestro de Obra</th>
+                        <th class="text-end">Total Vendido</th>
+                        <th class="text-center" style="width: 220px;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for venta in ventas %}
+                    <tr>
+                        <td><span class="badge bg-secondary fs-6">#{{ venta.id }}</span></td>
+                        <td>{{ venta.fecha }}</td>
+                        <td><strong>{{ venta.cliente }}</strong></td>
+                        <td class="text-end fw-bold text-success">${{ "{:,.0f}".format(venta.total).replace(',', '.') }}</td>
+                        <td class="text-center">
+                            <div class="d-flex justify-content-center gap-1">
+                                <button class="btn btn-sm btn-outline-primary" onclick="verDetalleFactura('{{ venta.id }}')">
+                                    <i class="bi bi-eye-fill"></i> Detalle
+                                </button>
+                                <a href="/historial/imprimir/{{ venta.id }}" target="_blank" class="btn btn-sm btn-outline-success">
+                                    <i class="bi bi-printer-fill"></i> Factura
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">
+                            No se han realizado ventas todavía.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- VENTANA FLOTANTE (MODAL) PARA VER EL DESGLOSE DE LA COMPRA -->
+<div class="modal fade" id="modalDetalle" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="modalTitulo">Detalle de Factura</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <div class="modal-body p-0">
+                <table class="table table-sm table-striped mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Producto</th>
+                            <th class="text-center">Cant.</th>
+                            <th class="text-end pe-3">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cuerpo-modal-detalle">
+                        <!-- Se llena con JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function verDetalleFactura(id) {
+    document.getElementById('modalTitulo').innerText = `Detalle de Factura #${id}`;
+    const cuerpo = document.getElementById('cuerpo-modal-detalle');
+    cuerpo.innerHTML = `<tr><td colspan="3" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Cargando...</td></tr>`;
+    
+    // Abrir el modal usando Bootstrap
+    const miModal = new bootstrap.Modal(document.getElementById('modalDetalle'));
+    miModal.show();
+
+    // Consultar los artículos de la factura
+    fetch(`/api/detalle_venta/${id}`)
+        .then(res => res.json())
+        .then(detalles => {
+            cuerpo.innerHTML = '';
+            detalles.forEach(d => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="ps-3"><strong>${d.nombre}</strong><br><small class="text-muted">$${d.precio.toLocaleString('es-CO')} c/u</small></td>
+                    <td class="text-center fw-bold">${d.cantidad}</td>
+                    <td class="text-end pe-3 fw-bold text-primary">$${d.subtotal.toLocaleString('es-CO', {maximumFractionDigits:0})}</td>
+                `;
+                cuerpo.appendChild(tr);
+            });
+        });
+}
+</script>
+{% endblock %}

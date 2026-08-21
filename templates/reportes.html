@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                    <div>
+                        <h3 class="text-dark mb-1"><i class="bi bi-bar-chart-line-fill text-primary me-2"></i>Reportes y Cierre de Caja</h3>
+                        <p class="text-muted mb-0">Monitorea los ingresos, flujo de facturas y rotación de productos de La Clínica del Hogar.</p>
+                    </div>
+                    <!-- Filtros de Fecha -->
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="date" id="fecha-inicio" class="form-control form-control-sm border-secondary fw-bold" style="width: 145px;">
+                        <span class="text-muted fw-bold">a</span>
+                        <input type="date" id="fecha-fin" class="form-control form-control-sm border-secondary fw-bold" style="width: 145px;">
+                        <button class="btn btn-sm btn-primary px-3" onclick="cargarDatosReporte()">
+                            <i class="bi bi-filter"></i> Filtrar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tarjetas de Resumen Numérico -->
+<div class="row mb-4">
+    <div class="col-md-6 col-lg-4 mb-3 mb-lg-0">
+        <div class="card border-0 shadow-sm bg-primary text-white">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-white-50 text-uppercase fw-bold mb-1" style="font-size: 0.8rem; letter-spacing: 1px;">Ingresos Totales</h6>
+                        <h2 class="fw-bold mb-0" id="card-ingresos">$0</h2>
+                    </div>
+                    <div class="fs-1 text-white-50"><i class="bi bi-currency-dollar"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-4 mb-3 mb-lg-0">
+        <div class="card border-0 shadow-sm bg-dark text-white">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted text-uppercase fw-bold mb-1" style="font-size: 0.8rem; letter-spacing: 1px;">Facturas Emitidas</h6>
+                        <h2 class="fw-bold mb-0" id="card-facturas">0</h2>
+                    </div>
+                    <div class="fs-1 text-muted"><i class="bi bi-receipt"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-12 col-lg-4">
+        <div class="card border-0 shadow-sm bg-white border-start border-4 border-success">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted text-uppercase fw-bold mb-1" style="font-size: 0.8rem; letter-spacing: 1px;">Ticket Promedio</h6>
+                        <h2 class="fw-bold text-success mb-0" id="card-promedio">$0</h2>
+                    </div>
+                    <div class="fs-1 text-success-50 opacity-50"><i class="bi bi-calculator"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Tabla: Productos Más Vendidos -->
+    <div class="col-lg-5 mb-4 mb-lg-0">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0 py-3">
+                <h5 class="text-dark fw-bold mb-0"><i class="bi bi-trophy text-warning me-2"></i>Top 5 Artículos Más Vendidos</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead class="table-light text-muted small uppercase">
+                            <tr>
+                                <th class="ps-3">Producto</th>
+                                <th class="text-center">Cant.</th>
+                                <th class="text-end pe-3">Total Ventas</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-top-productos">
+                            <!-- JS dinámico -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla: Desglose de Facturas para Cuadre -->
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                <h5 class="text-dark fw-bold mb-0"><i class="bi bi-list-check text-success me-2"></i>Auditoría de Ventas del Periodo</h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir Reporte</button>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light text-muted small position-sticky top-0 z-1">
+                            <tr>
+                                <th class="ps-3">Factura</th>
+                                <th>Fecha</th>
+                                <th>Cliente / Maestro</th>
+                                <th class="text-end pe-3">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-listado-ventas">
+                            <!-- JS dinámico -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Establecer el día de hoy por defecto al cargar los inputs
+document.addEventListener('DOMContentLoaded', function() {
+    const hoy = new Date().toISOString().split('T')[0];
+    document.getElementById('fecha-inicio').value = hoy;
+    document.getElementById('fecha-fin').value = hoy;
+    cargarDatosReporte();
+});
+
+function cargarDatosReporte() {
+    const inicio = document.getElementById('fecha-inicio').value;
+    const fin = document.getElementById('fecha-fin').value;
+
+    fetch(`/api/obtener_reportes?inicio=${inicio}&fin=${fin}`)
+        .then(res => res.json())
+        .then(data => {
+            // 1. Renderizar Tarjetas principales
+            document.getElementById('card-ingresos').innerText = '$' + data.ingresos_totales.toLocaleString('es-CO', {maximumFractionDigits:0});
+            document.getElementById('card-facturas').innerText = data.total_facturas;
+            
+            const promedio = data.total_facturas > 0 ? (data.ingresos_totales / data.total_facturas) : 0;
+            document.getElementById('card-promedio').innerText = '$' + promedio.toLocaleString('es-CO', {maximumFractionDigits:0});
+
+            // 2. Renderizar Tabla Top Productos
+            const tbodyTop = document.getElementById('tabla-top-productos');
+            tbodyTop.innerHTML = '';
+            if(data.top_productos.length === 0) {
+                tbodyTop.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-4">No hay artículos vendidos en este periodo.</td></tr>`;
+            } else {
+                data.top_productos.forEach(p => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="ps-3 fw-bold text-dark">${p.nombre}</td>
+                        <td class="text-center"><span class="badge bg-light text-dark border fw-bold fs-6">${p.unidades}</span></td>
+                        <td class="text-end pe-3 fw-bold text-primary">$${p.total_generado.toLocaleString('es-CO', {maximumFractionDigits:0})}</td>
+                    `;
+                    tbodyTop.appendChild(tr);
+                });
+            }
+
+            // 3. Renderizar Listado de Facturas
+            const tbodyLista = document.getElementById('tabla-listado-ventas');
+            tbodyLista.innerHTML = '';
+            if(data.ventas.length === 0) {
+                tbodyLista.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-4">No se registran transacciones en este rango.</td></tr>`;
+            } else {
+                data.ventas.forEach(v => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="ps-3"><span class="badge bg-secondary">#${v.id}</span></td>
+                        <td class="small text-muted fw-bold">${v.fecha}</td>  
+                        <td><strong class="text-dark">${v.cliente}</strong></td>
+                        <td class="text-end pe-3 fw-bold text-success">$${v.total.toLocaleString('es-CO', {maximumFractionDigits:0})}</td>
+                    `;
+                    tbodyLista.appendChild(tr);
+                });
+            }
+        })
+        .catch(err => console.error("Error al obtener reportes:", err));
+}
+</script>
+{% endblock %}
